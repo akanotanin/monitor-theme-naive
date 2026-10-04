@@ -1,6 +1,7 @@
-import { cpSync, createReadStream, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
+import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import process from 'node:process'
 
 /**
  * 打包极简探针主题包
@@ -8,7 +9,7 @@ import { createHash } from 'node:crypto'
  * 结构：theme.json / LICENSE / dist / preview.png
  */
 const meta = JSON.parse(readFileSync('theme.json', 'utf8'))
-if (!/^[a-zA-Z0-9_-]+$/.test(meta.short))
+if (!/^[\w-]+$/.test(meta.short))
   throw new Error('Invalid theme short name')
 for (const key of ['name', 'description', 'version', 'author', 'url']) {
   if (typeof meta[key] !== 'string' || !meta[key].trim())

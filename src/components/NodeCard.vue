@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import type { NodeData } from '@/stores/nodes'
 import { NButton, NCard, NEllipsis, NIcon, NModal, NProgress, NTag, NText, NTooltip, useThemeVars } from 'naive-ui'
-import { computed, ref } from 'vue'
-import PingChart from '@/components/PingChart.vue'
+import { computed, defineAsyncComponent, ref } from 'vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useGlassSurface } from '@/composables/useGlassSurface'
 import { useAppStore } from '@/stores/app'
@@ -18,6 +17,9 @@ const props = defineProps<{
 const emit = defineEmits<{
   click: []
 }>()
+
+/** 延迟图表按需加载：echarts 体积大，只有点开弹窗时才拉取 */
+const PingChart = defineAsyncComponent(() => import('@/components/PingChart.vue'))
 
 const appStore = useAppStore()
 const { glassSurfaceStyle, isGlassEnabled } = useGlassSurface()

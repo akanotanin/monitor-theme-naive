@@ -1,23 +1,23 @@
+import type { MonitorNode } from './types'
 import type { Client, NodeStatus } from '@/types/komari'
 import { getEmojiByCode } from '@/utils/regionHelper'
-import type { MonitorNode } from './types'
 
 /**
  * Monitor 的计费周期文案与 Komari 的天数表示互转
  * Komari 主题按天数（30/90/365…）判断周期类型，Hub 存的是文案
  */
 const BILLING_CYCLE_DAYS: Record<string, number> = {
-  monthly: 30,
-  quarterly: 90,
-  semiannual: 180,
+  'monthly': 30,
+  'quarterly': 90,
+  'semiannual': 180,
   'semi-annual': 180,
   'semi_annual': 180,
-  yearly: 365,
-  annual: 365,
-  biennial: 730,
-  triennial: 1095,
-  quinquennial: 1825,
-  once: -1,
+  'yearly': 365,
+  'annual': 365,
+  'biennial': 730,
+  'triennial': 1095,
+  'quinquennial': 1825,
+  'once': -1,
 }
 
 /** Komari 的 traffic_limit_type 只认识这几种取值，其余一律按 sum 处理 */

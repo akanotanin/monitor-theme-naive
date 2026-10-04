@@ -1,5 +1,6 @@
 import { execSync } from 'node:child_process'
 import { createRequire } from 'node:module'
+import process from 'node:process'
 import { fileURLToPath, URL } from 'node:url'
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
@@ -73,15 +74,16 @@ export default defineConfig({
     chunkSizeWarningLimit: 600,
     rolldownOptions: {
       output: {
+        // 只拆 vendor，别把 echarts 单独成块：rolldown 会把 @vue/* 运行时与 tslib
+        // 一起塞进「echarts」那个块，首屏为了拿到 vue 运行时就得连带下载整包 echarts
+        // （611 KB / gzip 214 KB）。交给默认分包后，echarts 只跟着 PingChart / LoadChart
+        // 按需加载，首屏不再碰它。
         manualChunks(id) {
-          if (['/node_modules/vue/', '/node_modules/vue-router/', '/node_modules/pinia/'].some(dependency => id.includes(dependency))) {
-            return 'vue-vendor'
-          }
-          if (['/node_modules/echarts/', '/node_modules/vue-echarts/'].some(dependency => id.includes(dependency))) {
-            return 'echarts'
-          }
           if (id.includes('/node_modules/naive-ui/')) {
             return 'naive-ui'
+          }
+          if (['/node_modules/vue/', '/node_modules/vue-router/', '/node_modules/pinia/', '/node_modules/@vue/', '/node_modules/tslib/'].some(dependency => id.includes(dependency))) {
+            return 'vue-vendor'
           }
           if (id.includes('/node_modules/@vueuse/core/')) {
             return 'vueuse'

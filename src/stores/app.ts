@@ -3,6 +3,7 @@ import type { ByteDecimalsConfig, UptimeFormat } from '@/utils/helper'
 import { usePreferredDark, useStorageAsync } from '@vueuse/core'
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { manifest } from '@/monitor/config'
 
 type ThemeMode = 'auto' | 'light' | 'dark'
 type Lang = 'zh-CN' | 'en-US'
@@ -14,9 +15,32 @@ export type CardMetric = 'cpu' | 'memory' | 'disk' | 'traffic'
 
 const DEFAULT_CARD_METRICS: CardMetric[] = ['cpu', 'memory', 'disk', 'traffic']
 
+/** List 视图可选的列名（`tags` 不在默认列里，站长可以在「显示列」里加上） */
+const LIST_VIEW_COLUMNS = ['status', 'region', 'name', 'tags', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic', 'rate'] as const
+type ListViewColumn = typeof LIST_VIEW_COLUMNS[number]
+
+/** 读 theme.json 里的默认列（与后台面板同一份来源），取不到才退回内置顺序 */
+function readDefaultListViewColumns(): ListViewColumn[] {
+  const raw = manifest.config?.find(field => field.key === 'listViewColumns')?.default
+  if (typeof raw === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const columns = parsed.filter((column): column is ListViewColumn =>
+          typeof column === 'string' && LIST_VIEW_COLUMNS.includes(column as ListViewColumn))
+        if (columns.length > 0)
+          return columns
+      }
+    }
+    catch {
+      // 解析不了就落到下面的内置兜底
+    }
+  }
+  return ['status', 'region', 'name', 'rate', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic']
+}
+
 /** 默认的 List 视图列配置 */
-const DEFAULT_LIST_VIEW_COLUMNS = ['status', 'region', 'name', 'tags', 'uptime', 'os', 'cpu', 'mem', 'disk', 'traffic', 'rate'] as const
-type ListViewColumn = typeof DEFAULT_LIST_VIEW_COLUMNS[number]
+const DEFAULT_LIST_VIEW_COLUMNS: ListViewColumn[] = readDefaultListViewColumns()
 
 /** 默认的 List 视图列宽度配置 */
 const DEFAULT_LIST_COLUMN_WIDTHS: Record<string, string> = {
@@ -149,7 +173,12 @@ const useAppStore = defineStore('app', () => {
 
   const cardMinWidth = computed<number>(() => {
     const value = publicSettings.value?.theme_settings?.cardMinWidth
-    return typeof value === 'number' && value >= 280 && value <= 520 ? value : 340
+    // 区间取 theme.json 声明的 min/max：面板里能填的值，页面就必须照做，不许静默回落
+    const field = manifest.config?.find(item => item.key === 'cardMinWidth')
+    const min = typeof field?.min === 'number' ? field.min : 200
+    const max = typeof field?.max === 'number' ? field.max : 640
+    const fallback = typeof field?.default === 'number' ? field.default : 340
+    return typeof value === 'number' && value >= min && value <= max ? value : fallback
   })
 
   const cardMetrics = computed<CardMetric[]>(() => {
@@ -200,7 +229,7 @@ const useAppStore = defineStore('app', () => {
       // 验证每个列名是否有效
       const validColumns: ListViewColumn[] = []
       for (const col of parsed) {
-        if (typeof col === 'string' && DEFAULT_LIST_VIEW_COLUMNS.includes(col as ListViewColumn)) {
+        if (typeof col === 'string' && LIST_VIEW_COLUMNS.includes(col as ListViewColumn)) {
           validColumns.push(col as ListViewColumn)
         }
       }
@@ -236,9 +265,9 @@ const useAppStore = defineStore('app', () => {
         return defaultWidths
       }
 
-      // 合并配置，保留有效列的宽度
+      // 合并配置，保留有效列的宽度（按可选列清单遍历，tags 这类非默认列也要吃配置）
       const mergedWidths = { ...defaultWidths }
-      for (const col of DEFAULT_LIST_VIEW_COLUMNS) {
+      for (const col of LIST_VIEW_COLUMNS) {
         if (typeof parsed[col] === 'string' && parsed[col].trim()) {
           mergedWidths[col] = parsed[col].trim()
         }

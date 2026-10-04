@@ -4,12 +4,12 @@
  * 数据来自极简探针的 /api/nodes 与 /api/ws，映射后写入 nodes store
  */
 
+import type { LiveHandle } from '@/monitor/transport'
 import type { MonitorNode } from '@/monitor/types'
+import { connectLive, mappedNodes, readNodes } from '@/monitor/transport'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { getSharedApi } from '@/utils/api'
-import { connectLive, mappedNodes, readNodes } from '@/monitor/transport'
-import type { LiveHandle } from '@/monitor/transport'
 
 /** 初始化配置 */
 interface InitConfig {

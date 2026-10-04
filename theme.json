@@ -2,7 +2,7 @@
   "name": "Monitor Naive",
   "short": "naive",
   "description": "极简探针（Monitor）的 Naive UI 风格主题，前身来自 lyimoexiao/komari-theme-naive。",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "author": "移植到 Monitor by akanotanin",
   "url": "https://github.com/akanotanin/monitor-theme-naive",
   "config": [
@@ -82,7 +82,7 @@
       "type": "boolean",
       "key": "showGeneralCards",
       "label": "显示数据总览",
-      "default": false,
+      "default": true,
       "help": "显示当前时间、在线节点、区域、总流量和实时速率"
     },
     {

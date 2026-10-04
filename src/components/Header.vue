@@ -72,8 +72,8 @@ function handleButtonClick(action: string) {
 <template>
   <div class="transition-all duration-200 top-0 position-sticky z-10" :class="isScrolled ? 'bg-$n-color shadow-sm backdrop-blur-md' : 'bg-transparent'">
     <div class="px-4 flex-between h-16" :style="containerStyle">
-      <div class="flex items-center cursor-pointer" @click="router.push('/')">
-        <NH3 class="m-0! text-[21px]! font-semibold! leading-none tracking-tight">
+      <div class="flex cursor-pointer items-center" @click="router.push('/')">
+        <NH3 class="leading-none tracking-tight text-[21px]! font-semibold! m-0!">
           {{ appStore.publicSettings?.sitename || 'Monitor' }}
         </NH3>
       </div>

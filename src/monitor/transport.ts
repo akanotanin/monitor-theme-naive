@@ -1,6 +1,6 @@
+import type { HistoryWindow, MonitorFrame, MonitorNode } from './types'
 import type { PingRecord, PingTaskSummary, StatusRecord } from '@/types/komari'
 import { mapNode } from './mapping'
-import type { HistoryWindow, MonitorFrame, MonitorNode } from './types'
 
 /**
  * 极简探针传输层

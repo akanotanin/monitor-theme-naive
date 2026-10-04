@@ -16,7 +16,6 @@ catalog:
   '@vitejs/plugin-vue': ^6.0.8
   '@vue/tsconfig': ^0.9.1
   '@vueuse/core': ^14.3.0
-  archiver: ^8.0.0
   dayjs: ^1.11.21
   echarts: ^6.1.0
   eslint: ^10.7.0

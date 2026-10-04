@@ -1,6 +1,6 @@
+import type { MeInfo, PublicInfo, VersionInfo } from '@/types/komari'
 import { loadConfig } from '@/monitor/config'
 import { isAdmin, preserveHours, site } from '@/monitor/transport'
-import type { MeInfo, PublicInfo, VersionInfo } from '@/types/komari'
 
 /**
  * 极简探针公开接口封装
@@ -28,8 +28,8 @@ export class MonitorApi {
       location.assign('/admin/')
     }
     return {
-      'logged_in': info.authed,
-      'username': info.authed ? '管理员' : '',
+      logged_in: info.authed,
+      username: info.authed ? '管理员' : '',
     }
   }
 
