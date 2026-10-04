@@ -1,6 +1,6 @@
 # Monitor Naive
 
-![Monitor Naive 主题首页预览](preview.png?v=2)
+![Monitor Naive 主题首页预览](preview.png?v=3)
 
 把 [lyimoexiao/komari-theme-naive](https://github.com/lyimoexiao/komari-theme-naive) 移植到极简探针（[Monitor](https://github.com/monitor-probe/monitor)）的主题：沿用 Naive UI 的克制绿调与细边框，卡片 / 列表双视图，深浅两套主色。站点设置全部存在 hub 里，访客端不落副本。
 

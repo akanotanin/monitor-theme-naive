@@ -34,5 +34,8 @@ coverage
 # Vite
 *.timestamp-*-*.mjs
 
+# 验收与预览图的产物（scripts 会往这里写）
+/shots/
+
 # 主题打包产物
 release/
