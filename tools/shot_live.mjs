@@ -1,6 +1,7 @@
-// 对着**线上 hub**（或隧道里的那台）拍一张并读一组 DOM 事实：装的是不是这一版、图标取得到取不到。
+// 对着**线上 hub**（或隧道里的那台）拍一张并读一组 DOM 事实：装的是不是这一版、图标取得到取不到、
+// 实时推送是不是按 hub 1.4.0 的约定收了 gzip 二进制帧。
 // 用法：node tools/shot_live.mjs <baseUrl> <输出.png> [宽=1440] [高=1000] [DPR=1]
-//   node tools/shot_live.mjs http://127.0.0.1:7980 shots/live.png
+//   node tools/shot_live.mjs http://127.0.0.1:7982 shots/live.png
 //   node tools/shot_live.mjs https://<域名> shots/live.png 390 844 2
 //
 // 与 shot_preview.mjs 的分工：那个起本地桩拍「仓库里这一版长什么样」，
@@ -10,11 +11,28 @@ import process from 'node:process'
 import { setTimeout as sleep } from 'node:timers/promises'
 import { openSession } from './cdp.mjs'
 
-const base = (process.argv[2] || 'http://127.0.0.1:7980').replace(/\/$/, '')
+const base = (process.argv[2] || 'http://127.0.0.1:7982').replace(/\/$/, '')
 const out = process.argv[3] || 'shots/live.png'
 const width = Number(process.argv[4] || 1440)
 const height = Number(process.argv[5] || 1000)
 const dpr = Number(process.argv[6] || 1)
+
+// 在页面自己的脚本之前挂上：记下 WS 地址与每一帧的类型。
+// hub 只在客户端带 ?gzip 时才压帧，所以「收到二进制帧」= 主题真的带了参数、也真的解得开。
+const WS_HOOK = `(() => {
+  const Original = window.WebSocket
+  window.__wsList = []
+  window.__wsFrames = []
+  window.WebSocket = function (...args) {
+    const ws = new Original(...args)
+    window.__wsList.push(String(args[0]))
+    ws.addEventListener('message', (e) => {
+      window.__wsFrames.push(typeof e.data === 'string' ? 'text' : (e.data && e.data.constructor ? e.data.constructor.name : typeof e.data))
+    })
+    return ws
+  }
+  window.WebSocket.prototype = Original.prototype
+})()`
 
 mkdirSync(out.split('/').slice(0, -1).join('/') || '.', { recursive: true })
 
@@ -24,11 +42,12 @@ try {
   const chunks = [...head.matchAll(/\/assets\/([\w.-]+\.js)/g)].map(m => m[1])
   console.log(`入口 chunk：${chunks.slice(0, 3).join(' / ') || '（没读到）'}`)
 
+  await session.send('Page.addScriptToEvaluateOnNewDocument', { source: WS_HOOK })
   await session.goto(`${base}/`)
   const ready = await session.waitFor(`document.querySelectorAll('.node-grid .n-card').length > 0 && document.fonts.status === 'loaded'`, 60000)
   if (!ready)
     console.warn('⚠ 就绪条件超时（卡片没出来），拍出来的图不能当证据')
-  await sleep(3500)
+  await sleep(6000)
 
   const facts = await session.evaluate(`(async () => {
     const probe = async (url) => {
@@ -44,7 +63,9 @@ try {
       summaryCards: document.querySelectorAll('.general-info .n-card').length,
       icon: document.querySelector('link[rel="icon"]')?.getAttribute('href') ?? null,
       apple: document.querySelector('link[rel="apple-touch-icon"]')?.getAttribute('href') ?? null,
-      offline: document.body.innerText.includes('节点已离线'),
+      ws: window.__wsList,
+      frames: [...new Set(window.__wsFrames)],
+      offline: document.body.innerText.split('\\n').filter(l => l.includes('离线')).slice(0, 4),
       icons: [await probe(new URL(document.querySelector('link[rel="icon"]').href).pathname),
               await probe(new URL(document.querySelector('link[rel="apple-touch-icon"]').href).pathname)],
     })
@@ -54,6 +75,9 @@ try {
   console.log(`标签页图标 ${data.icon} · iOS 图标 ${data.apple}`)
   for (const icon of data.icons ?? [])
     console.log(`  ${icon.url} → ${icon.status} ${icon.type} ${icon.bytes} B${icon.error ? ` (${icon.error})` : ''}`)
+  console.log(`实时推送 ${(data.ws ?? []).join(' / ')}（帧类型 ${(data.frames ?? []).join(',') || '还没收到'}）`)
+  if (data.offline?.length)
+    console.log(`离线文案：${data.offline.join(' | ')}`)
 
   const saved = await session.screenshot(out)
   console.log(`📷 ${saved}（${Math.round(statSync(saved).size / 1024)} KB，视口 ${width}x${height}@${dpr}）`)
