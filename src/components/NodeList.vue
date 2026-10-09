@@ -5,7 +5,7 @@ import { computed, defineAsyncComponent, ref } from 'vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useGlassSurface } from '@/composables/useGlassSurface'
 import { useAppStore } from '@/stores/app'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatOfflineDuration, formatUptimeWithFormat, getStatus } from '@/utils/helper'
 import { getOSImage, getOSName } from '@/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 import { parseTags } from '@/utils/tagHelper'
@@ -260,7 +260,10 @@ function getTrafficUsed(node: NodeData): number {
 }
 
 function formatOfflineTime(node: NodeData): string {
-  return formatDateTime(node.time)
+  const ago = formatOfflineDuration(node.last_seen_ago)
+  const seen = `最后在线 ${formatDateTime(node.time)}`
+  // 离线时长按 hub 的时钟算（last_seen_ago）；hub 没给这一项（旧版）时就只写最后在线时间
+  return ago ? `离线 ${ago} · ${seen}` : seen
 }
 
 // 计算节点的标签列表（返回颜色）：只保留节点自带的自定义标签

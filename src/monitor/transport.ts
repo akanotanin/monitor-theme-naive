@@ -1,4 +1,4 @@
-import type { HistoryWindow, MonitorFrame, MonitorNode } from './types'
+import type { HistoryWindow, MonitorFrame, MonitorNode, SiteInfo } from './types'
 import type { PingRecord, PingTaskSummary, StatusRecord } from '@/types/komari'
 import { mapNode } from './mapping'
 
@@ -14,7 +14,7 @@ const API_BASE = (import.meta.env.VITE_API_BASE || '/api').replace(/\/$/, '')
 const SNAPSHOT_TTL = 1500
 /** 历史窗口缓存：图表按 dataUpdateInterval 轮询，粒度不会比 1 分钟更细 */
 const HISTORY_TTL = 15000
-/** 匿名访客与管理员各自能看到的历史窗口（小时） */
+/** 旧 hub（没有 history_days）的历史窗口上限（小时）：匿名 7 天、登录 90 天 */
 const PUBLIC_HOURS = 168
 const ADMIN_HOURS = 2160
 
@@ -22,6 +22,8 @@ let snapshot: MonitorNode[] = []
 let admin = false
 let received = 0
 let pending: Promise<MonitorNode[]> | undefined
+/** hub 的保留天数（/api/me 的 history_days），旧 hub 为 null */
+let historyDays: number | null = null
 const historyCache = new Map<string, { time: number, promise: Promise<HistoryWindow> }>()
 
 export class MonitorRequestError extends Error {
@@ -62,13 +64,22 @@ export function acceptFrame(frame: Partial<MonitorFrame> | null | undefined): Mo
 }
 
 /** 读取节点列表（带 1.5 秒缓存） */
-export async function readNodes(): Promise<MonitorNode[]> {
+export async function readNodes(signal?: AbortSignal): Promise<MonitorNode[]> {
   if (Date.now() - received < SNAPSHOT_TTL)
     return snapshot
-  pending ??= request<MonitorFrame>('/nodes')
+  pending ??= request<MonitorFrame>('/nodes', signal)
     .then(frame => acceptFrame(frame))
     .finally(() => { pending = undefined })
-  return pending
+  return await pending
+}
+
+/**
+ * 丢掉快照缓存与在途请求：页面切到后台再回到前台时调用，
+ * 回前台那一次必然重新取一份，而不是拿切走之前的旧快照
+ */
+export function resetSnapshot(): void {
+  received = 0
+  pending = undefined
 }
 
 /** 当前访客是否为已登录管理员（由 /api/nodes 的 admin 字段给出） */
@@ -76,8 +87,10 @@ export function isAdmin(): boolean {
   return admin
 }
 
-/** 历史窗口上限（小时），供主题的图表选择器使用 */
+/** 历史窗口上限（小时）：hub 1.3.2 起就是保留天数本身，匿名与登录相同 */
 export function preserveHours(): number {
+  if (historyDays !== null)
+    return Math.max(1, Math.round(historyDays * 24))
   return admin ? ADMIN_HOURS : PUBLIC_HOURS
 }
 
@@ -90,9 +103,12 @@ export function mappedNodes(nodes: MonitorNode[]) {
   }
 }
 
-/** 站点名称与登录状态 */
-export async function site() {
-  return await request<{ authed: boolean, github: boolean, public_page: boolean, site: string, site_name: string }>('/me')
+/** 站点名称与登录状态；顺手记下 hub 的保留天数，供历史窗口选择器使用 */
+export async function site(): Promise<SiteInfo> {
+  const info = await request<SiteInfo>('/me')
+  if (typeof info.history_days === 'number' && Number.isFinite(info.history_days) && info.history_days > 0)
+    historyDays = info.history_days
+  return info
 }
 
 /**
@@ -318,6 +334,19 @@ export interface LiveHandle {
 }
 
 /**
+ * hub 1.4.0 起可以按 gzip 推帧（每帧 110 KB → 15 KB）：请求参数带上 gzip，
+ * 帧就走二进制。站长登录着打开公开页、或 hub 是旧版时仍推文本帧，两种都要能收。
+ */
+const GZIP = typeof DecompressionStream === 'function' ? '?gzip' : ''
+
+/** 把一帧读成文本：gzip 帧是二进制，其余仍是文本 */
+async function frameText(data: string | Blob): Promise<string> {
+  if (typeof data === 'string')
+    return data
+  return await new Response(data.stream().pipeThrough(new DecompressionStream('gzip'))).text()
+}
+
+/**
  * 订阅 /api/ws 的节点快照
  * 连接失败会自动重连，主题侧另有轮询兜底，因此这里不做无限重试
  */
@@ -333,7 +362,7 @@ export function connectLive(
   let attempts = 0
   let closed = false
 
-  const url = new URL(`${API_BASE}/ws`, location.href)
+  const url = new URL(`${API_BASE}/ws${GZIP}`, location.href)
   url.protocol = location.protocol === 'https:' ? 'wss:' : 'ws:'
 
   const scheduleRetry = () => {
@@ -359,21 +388,30 @@ export function connectLive(
       scheduleRetry()
       return
     }
+    // gzip 帧走二进制；文本帧（旧 hub、或站长登录着看的完整视图）仍是字符串
+    socket.binaryType = 'blob'
     socket.onopen = () => {
       attempts = 0
       onState('connected')
     }
+    // 按到达顺序解码：gzip 帧是异步解开的，谁先读完不一定
+    let decoded = Promise.resolve()
     socket.onmessage = (event) => {
-      try {
-        const frame = JSON.parse(event.data as string) as MonitorFrame
-        if (Array.isArray(frame?.nodes)) {
-          acceptFrame(frame)
-          onNodes(frame.nodes)
-        }
-      }
-      catch {
-        // 忽略无法解析的帧
-      }
+      const source = socket
+      decoded = decoded
+        .then(async () => {
+          const frame = JSON.parse(await frameText(event.data as string | Blob)) as MonitorFrame
+          // 这一帧可能在连接被换掉之后才解开，那它描述的不是当前这一刻
+          if (source !== socket)
+            return
+          if (Array.isArray(frame?.nodes)) {
+            acceptFrame(frame)
+            onNodes(frame.nodes)
+          }
+        })
+        .catch(() => {
+          // 忽略无法解析的帧
+        })
     }
     socket.onerror = () => {
       onState('reconnecting')

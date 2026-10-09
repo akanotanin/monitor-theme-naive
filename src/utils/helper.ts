@@ -271,6 +271,26 @@ export function getStatus(percentage: number): 'success' | 'warning' | 'error' {
 }
 
 /**
+ * 离线时长文案：按 hub 下发的秒数（`last_seen_ago`）算，不拿 `last_seen` 减浏览器时钟 ——
+ * 访客时钟快 8 小时时，后者会把刚掉线的节点显示成离线 8 小时。
+ * 不满一分钟返回空串（这一档说不清，界面上宁可不写）。
+ */
+export function formatOfflineDuration(seconds: number | null | undefined): string {
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 60)
+    return ''
+
+  const days = Math.floor(seconds / 86400)
+  const hours = Math.floor((seconds % 86400) / 3600)
+  const minutes = Math.floor((seconds % 3600) / 60)
+
+  if (days > 0)
+    return `${days} 天 ${hours} 小时`
+  if (hours > 0)
+    return `${hours} 小时 ${minutes} 分钟`
+  return `${minutes} 分钟`
+}
+
+/**
  * 格式化时间戳为可读日期时间
  * @param timestamp 时间戳字符串或 Date 对象
  * @returns 格式化后的字符串，如 "2024-01-15 14:30:00"

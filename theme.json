@@ -2,8 +2,8 @@
   "name": "Monitor Naive",
   "short": "naive",
   "description": "极简探针（Monitor）的 Naive UI 风格主题，前身来自 lyimoexiao/komari-theme-naive。",
-  "version": "1.0.11",
-  "author": "移植到 Monitor by akanotanin",
+  "version": "1.1.0",
+  "author": "akanotanin / lyimoexiao",
   "url": "https://github.com/akanotanin/monitor-theme-naive",
   "config": [
     {

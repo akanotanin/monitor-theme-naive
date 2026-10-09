@@ -41,6 +41,8 @@ export interface MonitorNode {
   country: string
   /** 最后上报时间（秒） */
   last_seen: number
+  /** 距最后上报的秒数，按 hub 的时钟算；从未上报为 null。hub 1.4.0 起下发 */
+  last_seen_ago?: number | null
   os: string
   kernel: string
   arch: string
@@ -123,4 +125,6 @@ export interface SiteInfo {
   public_page: boolean
   site: string
   site_name: string
+  /** 历史保留天数，hub 1.3.2 起下发；旧 hub 没有这个字段 */
+  history_days?: number
 }

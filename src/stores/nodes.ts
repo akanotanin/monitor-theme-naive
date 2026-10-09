@@ -61,6 +61,8 @@ export interface NodeData {
   connections: number
   connections_udp: number
   uptime: number
+  /** 距最后上报的秒数（按 hub 的时钟），从未上报为 null */
+  last_seen_ago: number | null
 }
 
 /** WebSocket 连接状态 */
@@ -87,6 +89,7 @@ interface StatusData {
   connections: number
   connections_udp: number
   uptime: number
+  last_seen_ago: number | null
 }
 
 const useNodesStore = defineStore('nodes', () => {
@@ -180,6 +183,7 @@ const useNodesStore = defineStore('nodes', () => {
       connections: 0,
       connections_udp: 0,
       uptime: 0,
+      last_seen_ago: null,
     }
   }
 
@@ -208,6 +212,7 @@ const useNodesStore = defineStore('nodes', () => {
       connections: status.connections,
       connections_udp: status.connections_udp,
       uptime: status.uptime,
+      last_seen_ago: status.last_seen_ago,
     }
   }
 
@@ -235,6 +240,7 @@ const useNodesStore = defineStore('nodes', () => {
       connections: status.connections,
       connections_udp: status.connections_udp,
       uptime: status.uptime,
+      last_seen_ago: status.last_seen_ago ?? null,
     }
   }
 
@@ -345,6 +351,7 @@ const useNodesStore = defineStore('nodes', () => {
           connections: currentNode.connections,
           connections_udp: currentNode.connections_udp,
           uptime: currentNode.uptime,
+          last_seen_ago: currentNode.last_seen_ago,
         })
       }
       else {

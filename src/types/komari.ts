@@ -105,6 +105,8 @@ export interface NodeStatus {
   connections_udp: number
   online: boolean
   uptime: number
+  /** 距最后上报的秒数（按 hub 的时钟），从未上报为 null */
+  last_seen_ago?: number | null
 }
 
 export interface StatusRecord {

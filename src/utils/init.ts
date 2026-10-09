@@ -6,7 +6,7 @@
 
 import type { LiveHandle } from '@/monitor/transport'
 import type { MonitorNode } from '@/monitor/types'
-import { connectLive, mappedNodes, readNodes } from '@/monitor/transport'
+import { connectLive, mappedNodes, readNodes, resetSnapshot } from '@/monitor/transport'
 import { useAppStore } from '@/stores/app'
 import { useNodesStore } from '@/stores/nodes'
 import { getSharedApi } from '@/utils/api'
@@ -33,6 +33,10 @@ class InitManager {
   private pollTimer: ReturnType<typeof setInterval> | null = null
   private isPolling = false
   private isInitialized = false
+  /** 页面每切一次后台就 +1，用来作废切走之前发出的那一批请求 */
+  private generation = 0
+  /** 本页的在途请求，切到后台时直接 abort 掉 */
+  private inflight: AbortController | null = null
 
   constructor(config: InitConfig = {}) {
     this.config = { ...DEFAULT_CONFIG, ...config }
@@ -62,6 +66,7 @@ class InitManager {
 
       this.appStore.loading = false
       this.startLive()
+      document.addEventListener('visibilitychange', this.onVisibilityChange)
       this.isInitialized = true
     }
     catch (error) {
@@ -161,17 +166,60 @@ class InitManager {
     if (this.isPolling)
       return
     this.isPolling = true
+    const generation = this.generation
+    const controller = new AbortController()
+    this.inflight = controller
     try {
-      const nodes = await readNodes()
-      this.applyNodes(nodes)
+      const nodes = await readNodes(controller.signal)
+      if (generation === this.generation)
+        this.applyNodes(nodes)
     }
     catch (error) {
+      // 被 abort、或页面已经切到后台：这一帧作废，不算故障
+      if (controller.signal.aborted || generation !== this.generation)
+        return
       console.error('[InitManager] Poll error:', error)
       this.appStore.connectionError = true
     }
     finally {
-      this.isPolling = false
+      if (generation === this.generation) {
+        this.isPolling = false
+        if (this.inflight === controller)
+          this.inflight = null
+      }
     }
+  }
+
+  /**
+   * 页面切到后台：停轮询、断开推送、丢掉在途请求
+   * 手机把页面挂起时会悄悄掐断连接，留着它只会拿到不再更新的数据
+   */
+  private pause(): void {
+    this.generation += 1
+    this.inflight?.abort()
+    this.inflight = null
+    this.isPolling = false
+    this.stopPolling()
+    this.live?.close()
+    this.live = null
+    resetSnapshot()
+  }
+
+  /** 回到前台：立刻补拉一次 /api/nodes，并把推送重新连上 */
+  private resume(): void {
+    this.pause()
+    void this.poll()
+    this.startLive()
+  }
+
+  /** 页面可见性变化（切到后台 / 回到前台） */
+  private onVisibilityChange = (): void => {
+    if (!this.isInitialized)
+      return
+    if (document.hidden)
+      this.pause()
+    else
+      this.resume()
   }
 
   /** 停止轮询 */
@@ -193,6 +241,7 @@ class InitManager {
 
   /** 销毁管理器 */
   destroy(): void {
+    document.removeEventListener('visibilitychange', this.onVisibilityChange)
     this.stopPolling()
     this.live?.close()
     this.live = null

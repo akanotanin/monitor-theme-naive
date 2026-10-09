@@ -5,7 +5,7 @@ import { computed, defineAsyncComponent, ref } from 'vue'
 import TrafficProgress from '@/components/TrafficProgress.vue'
 import { useGlassSurface } from '@/composables/useGlassSurface'
 import { useAppStore } from '@/stores/app'
-import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatUptimeWithFormat, getStatus } from '@/utils/helper'
+import { formatBytesPerSecondWithConfig, formatBytesWithConfig, formatDateTime, formatOfflineDuration, formatUptimeWithFormat, getStatus } from '@/utils/helper'
 import { getOSImage, getOSName } from '@/utils/osImageHelper'
 import { getRegionCode, getRegionDisplayName } from '@/utils/regionHelper'
 import { parseTags } from '@/utils/tagHelper'
@@ -35,6 +35,8 @@ const formatBytes = (bytes: number) => formatBytesWithConfig(bytes, appStore.byt
 const formatBytesPerSecond = (bytes: number) => formatBytesPerSecondWithConfig(bytes, appStore.byteDecimals)
 const formatUptime = (seconds: number) => formatUptimeWithFormat(seconds, appStore.uptimeFormat)
 const offlineTime = computed(() => formatDateTime(props.node.time))
+/** 离线时长（按 hub 时钟的秒数）；不满一分钟为空，那一行就不渲染 */
+const offlineAgo = computed(() => formatOfflineDuration(props.node.last_seen_ago))
 
 // 计算统计信息
 const cpuStatus = computed(() => getStatus(props.node.cpu ?? 0))
@@ -345,6 +347,9 @@ function handleCardKeydown(event: KeyboardEvent): void {
               <span class="offline-mask__dot" />
               <span>节点已离线</span>
             </div>
+            <NText v-if="offlineAgo" :depth="3" class="offline-mask__time text-xs" :style="{ fontFamily: appStore.numberFontFamily }">
+              离线 {{ offlineAgo }}
+            </NText>
             <NText :depth="3" class="offline-mask__time text-xs" :style="{ fontFamily: appStore.numberFontFamily }">
               最后在线 {{ offlineTime }}
             </NText>

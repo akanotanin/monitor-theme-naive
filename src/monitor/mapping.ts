@@ -119,6 +119,8 @@ export function mapNode(node: MonitorNode): { client: Client, status: NodeStatus
     connections_udp: finite(m?.udp) ?? 0,
     online: Boolean(node.online),
     uptime: finite(m?.uptime) ?? 0,
+    // 离线时长按 hub 的时钟算，浏览器时钟不准时也照常显示
+    last_seen_ago: node.last_seen_ago ?? null,
   }
 
   // 生命周期累计流量单独保留，供需要总计的界面使用
